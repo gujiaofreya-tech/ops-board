@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>作战室生成器</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy: #0d1b2a;
+  --accent: #3a86ff;
+  --accent2: #06d6a0;
+  --bg: #f5f4f0;
+  --card: #ffffff;
+  --text: #1a1a1a;
+  --muted: #6b6b6b;
+  --border: rgba(0,0,0,0.09);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+/* ── STEP PAGES ── */
+.page { display: none; }
+.page.active { display: block; }
+
+/* ── STEP 1: INPUT ── */
+.input-wrap {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 60px 24px 80px;
+}
+.logo {
+  font-family: 'Syne', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--navy);
+  margin-bottom: 6px;
+}
+.logo span { color: var(--accent); }
+.tagline { font-size: 14px; color: var(--muted); margin-bottom: 36px; }
+
+.input-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 2px 20px rgba(0,0,0,0.05);
+}
+.input-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  margin-bottom: 10px;
+  display: block;
+}
+textarea {
+  width: 100%;
+  height: 340px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--text);
+  background: var(--bg);
+  resize: vertical;
+  outline: none;
+  transition: border-color .15s;
+}
+textarea:focus { border-color: var(--accent); }
+textarea::placeholder { color: #b0b0b0; }
+
+.btn-row { display: flex; justify-content: flex-end; margin-top: 16px; gap: 10px; }
+.btn {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 10px 24px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: opacity .15s, transform .1s;
+}
+.btn:active { transform: scale(.97); }
+.btn-primary { background: var(--navy); color: #fff; }
+.btn-primary:hover { opacity: .88; }
+.btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+.btn-ghost:hover { background: rgba(0,0,0,0.04); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+
+.parsing-state {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 14px;
+}
+.parsing-state.show { display: flex; }
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.error-msg {
+  display: none;
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: #fff2f2;
+  border: 1px solid #ffcece;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #b00020;
+}
+.error-msg.show { display: block; }
+
+/* ── STEP 2: PREVIEW ── */
+.preview-header {
+  background: var(--navy);
+  padding: 20px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.preview-header h2 {
+  font-family: 'Syne', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+}
+.preview-header p { font-size: 12px; color: rgba(255,255,255,.45); margin-top: 2px; }
+.hdr-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn-download { background: var(--accent2); color: var(--navy); font-weight: 600; }
+.btn-back { background: rgba(255,255,255,.1); color: rgba(255,255,255,.8); border: 1px solid rgba(255,255,255,.15); }
+
+#board-preview { width: 100%; border: none; min-height: 100vh; display: block; }
+</style>
+</head>
+<body>
+
+<!-- ── PAGE 1: INPUT ── -->
+<div class="page active" id="page-input">
+  <div class="input-wrap">
+    <div class="logo">作战室<span>生成器</span></div>
+    <div class="tagline">粘贴群通知 → AI 自动解析 → 生成可分享的任务看板</div>
+
+    <div class="input-card">
+      <label class="input-label">粘贴你的群通知内容（支持任意格式）</label>
+      <textarea id="input-text" placeholder="@所有人 本周待办事件（我们太曼妙了）
+订阅：
+1. 广告需要提到哪些点...
+EDM:
+1. 3.16 加拿大澳cider...
+post：
+3.16 发为什么机器可以酿造白葡萄酒
+..."></textarea>
+
+      <div class="parsing-state" id="parsing-state">
+        <div class="spinner"></div>
+        <span id="parsing-msg">AI 正在解析任务结构...</span>
+      </div>
+      <div class="error-msg" id="error-msg"></div>
+
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="clearInput()">清空</button>
+        <button class="btn btn-primary" id="gen-btn" onclick="generate()">生成作战室 →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── PAGE 2: PREVIEW ── -->
+<div class="page" id="page-preview">
+  <div class="preview-header">
+    <div>
+      <h2 id="board-title">本周作战室</h2>
+      <p>点击任意任务卡片可切换状态</p>
+    </div>
+    <div class="hdr-btns">
+      <button class="btn btn-back" onclick="goBack()">← 重新输入</button>
+      <button class="btn btn-download" onclick="downloadHTML()">下载网页文件</button>
+    </div>
+  </div>
+  <iframe id="board-preview" title="作战室预览"></iframe>
+</div>
+
+<script>
+let generatedHTML = '';
+
+function clearInput() {
+  document.getElementById('input-text').value = '';
+}
+
+function goBack() {
+  document.getElementById('page-preview').classList.remove('active');
+  document.getElementById('page-input').classList.add('active');
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+
+function hideError() {
+  document.getElementById('error-msg').classList.remove('show');
+}
+
+async function generate() {
+  const text = document.getElementById('input-text').value.trim();
+  if (!text) { showError('请先粘贴群通知内容'); return; }
+
+  hideError();
+  const btn = document.getElementById('gen-btn');
+  const state = document.getElementById('parsing-state');
+  const msgEl = document.getElementById('parsing-msg');
+
+  btn.disabled = true;
+  state.classList.add('show');
+
+  const messages = [
+    `AI 正在解析任务结构...`,
+    `提取日期和负责人...`,
+    `整理任务类型分类...`,
+    `生成看板页面...`
+  ];
+  let mi = 0;
+  const ticker = setInterval(() => {
+    mi = (mi + 1) % messages.length;
+    msgEl.textContent = messages[mi];
+  }, 900);
+
+  const systemPrompt = `你是一个任务解析助手。用户会给你一段中文群通知，你需要把它解析成结构化的 JSON 数据。
+
+请输出如下 JSON（只输出 JSON，不要任何多余的文字或markdown代码块）：
+
+{
+  "title": "本周作战室 · [日期范围，从文本推断，如找不到就写本周]",
+  "weekNote": "副标题或口号（如文本中有类似'我们太曼妙了'这种）",
+  "nextWeekNote": "下周预告内容（如有的话，否则为空字符串）",
+  "days": [
+    {
+      "date": "3.16",
+      "week": "周一",
+      "today": true,
+      "tasks": [
+        { "type": "edm|post|sub|ad|site|blog|talk", "title": "任务描述", "person": "负责人" }
+      ]
+    }
+  ],
+  "ongoing": [
+    { "type": "edm|post|sub|ad|site|blog|talk", "title": "持续任务描述", "person": "负责人" }
+  ]
+}
+
+类型映射规则：
+- edm: EDM、邮件、email相关
+- post: 社媒发帖、post、发文
+- sub: 订阅、subscription相关
+- ad: 广告相关
+- site: 网站、banner、页面
+- blog: 博客、blog
+- talk: 讨论、会议、沟通、汇总
+- 其他默认用 talk
+
+日期处理：
+- 今天是2026年3月16日（周一），以此推断各日期是周几
+- 没有明确日期的持续任务放入 ongoing 数组
+- days 数组只包含有明确日期的日子
+
+注意：
+- person 字段提取负责人姓名，没有就留空字符串
+- title 要简洁，保留核心信息，可以包含括号里的补充说明
+- 如果一个日期下同一类型有多条，分别作为独立任务`;
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 3000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: text }]
+      })
+    });
+
+    clearInterval(ticker);
+
+    if (!resp.ok) throw new Error(`API 错误 ${resp.status}`);
+    const data = await resp.json();
+    const raw = data.content.find(b => b.type === 'text')?.text || '';
+
+    let parsed;
+    try {
+      const clean = raw.replace(/```json|```/g, '').trim();
+      parsed = JSON.parse(clean);
+    } catch (e) {
+      throw new Error('解析 JSON 失败，请重试');
+    }
+
+    msgEl.textContent = '生成完成！';
+    setTimeout(() => {
+      state.classList.remove('show');
+      btn.disabled = false;
+      buildBoard(parsed);
+    }, 400);
+
+  } catch (err) {
+    clearInterval(ticker);
+    state.classList.remove('show');
+    btn.disabled = false;
+    showError('出错了：' + err.message + '。请检查网络后重试。');
+  }
+}
+
+function buildBoard(data) {
+  const html = generateBoardHTML(data);
+  generatedHTML = html;
+
+  document.getElementById('board-title').textContent = data.title || '本周作战室';
+
+  const iframe = document.getElementById('board-preview');
+  iframe.srcdoc = html;
+  iframe.onload = () => {
+    try {
+      const h = iframe.contentDocument.documentElement.scrollHeight;
+      iframe.style.height = Math.max(h, 600) + 'px';
+    } catch(e) {}
+  };
+
+  document.getElementById('page-input').classList.remove('active');
+  document.getElementById('page-preview').classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+function downloadHTML() {
+  if (!generatedHTML) return;
+  const blob = new Blob([generatedHTML], { type: 'text/html;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'ops-board.html';
+  a.click();
+}
+
+function generateBoardHTML(data) {
+  const days = data.days || [];
+  const ongoing = data.ongoing || [];
+  const title = data.title || '本周作战室';
+  const weekNote = data.weekNote || '';
+  const nextWeekNote = data.nextWeekNote || '';
+
+  let id = 0;
+  const allTasks = [];
+  days.forEach(d => d.tasks.forEach(t => allTasks.push({ id: id++, dateKey: d.date, status: 0, ...t })));
+  ongoing.forEach(t => allTasks.push({ id: id++, dateKey: 'ongoing', status: 0, ...t }));
+
+  const tasksJSON = JSON.stringify(allTasks);
+  const daysJSON = JSON.stringify(days);
+
+  return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${title}</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#0d1b2a;--accent:#3a86ff;--accent2:#06d6a0;--bg:#f5f4f0;--card:#ffffff;--text:#1a1a1a;--muted:#6b6b6b;--border:rgba(0,0,0,0.09);--edm-bg:#e8f1ff;--edm-c:#1a4a99;--edm-dot:#3a86ff;--post-bg:#e0f7ef;--post-c:#0a5e43;--post-dot:#06d6a0;--sub-bg:#fde8f2;--sub-c:#8c1a52;--sub-dot:#e8478a;--ad-bg:#fff2e0;--ad-c:#7a3e00;--ad-dot:#f4a20a;--site-bg:#ede8ff;--site-c:#3d1fa8;--site-dot:#7c5cfa;--blog-bg:#edf7e0;--blog-c:#2d5a0d;--blog-dot:#5cb80d;--talk-bg:#f0eeeb;--talk-c:#4a4540;--talk-dot:#998f86;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+.header{background:var(--navy);padding:24px 40px 20px;position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border-bottom:1px solid rgba(255,255,255,.06);}
+.header h1{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;color:#fff;}
+.header p{font-size:12px;color:rgba(255,255,255,.4);margin-top:3px;}
+.header p span{color:var(--accent2);font-weight:500;}
+.stats{display:flex;gap:8px;flex-wrap:wrap;}
+.stat{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:7px 16px;text-align:center;min-width:62px;}
+.stat-n{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;color:#fff;}
+.stat-n.wip{color:#f4a20a;}.stat-n.done{color:var(--accent2);}
+.stat-l{font-size:10px;color:rgba(255,255,255,.4);margin-top:1px;}
+.legend-bar{background:#fff;border-bottom:1px solid var(--border);padding:9px 40px;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;}
+.leg{display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--muted);}
+.leg-dot{width:7px;height:7px;border-radius:50%;}
+.main{padding:24px 40px 60px;}
+.day-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;align-items:start;}
+.col-head{padding:0 2px 10px;border-bottom:2px solid var(--border);margin-bottom:10px;}
+.col-head.today{border-bottom-color:var(--accent);}
+.col-head .day{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;color:var(--text);display:block;}
+.col-head.today .day{color:var(--accent);}
+.today-badge{display:inline-block;background:var(--accent);color:#fff;font-size:9px;font-weight:500;padding:1px 5px;border-radius:4px;margin-left:5px;vertical-align:middle;position:relative;top:-1px;}
+.col-head .wday{font-size:11px;color:var(--muted);margin-top:2px;display:block;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 11px;margin-bottom:8px;cursor:pointer;transition:transform .12s,opacity .2s;user-select:none;animation:fadeUp .3s ease both;}
+.card:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(0,0,0,.07);}
+.card:active{transform:scale(.98);}
+.card.done{opacity:.42;}.card.done .card-title{text-decoration:line-through;}
+.card-type{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:500;padding:2px 7px;border-radius:5px;margin-bottom:6px;}
+.card-type-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+.card-title{font-size:12.5px;line-height:1.5;color:var(--text);margin-bottom:8px;}
+.card-footer{display:flex;align-items:center;justify-content:space-between;gap:4px;flex-wrap:wrap;}
+.person{font-size:11px;color:var(--muted);background:var(--bg);padding:2px 7px;border-radius:20px;white-space:nowrap;max-width:110px;overflow:hidden;text-overflow:ellipsis;}
+.status-btn{font-family:'DM Sans',sans-serif;font-size:10px;font-weight:500;padding:2px 8px;border-radius:20px;border:1px solid;background:transparent;cursor:pointer;white-space:nowrap;}
+.s0{color:#1a4a99;border-color:#3a86ff;}.s1{color:#7a3e00;border-color:#f4a20a;background:#fff8ee;}.s2{color:#0a5e43;border-color:#06d6a0;background:#f0fdf8;}
+.section{margin-top:28px;border-top:1px solid var(--border);padding-top:22px;}
+.section-title{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;margin-bottom:12px;}
+.ongoing-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;}
+.footer-note{margin-top:36px;padding:14px 18px;background:#fff;border:1px solid var(--border);border-radius:10px;font-size:12px;color:var(--muted);line-height:1.65;}
+.footer-note strong{color:var(--text);font-weight:500;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+@media(max-width:700px){.header,.legend-bar,.main{padding-left:18px;padding-right:18px;}.day-grid{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:440px){.day-grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<header class="header">
+  <div><h1>${title}${weekNote ? ' 🍺' : ''}</h1><p>${weekNote ? weekNote + ' · ' : ''}共 <span id="total">0</span> 项 · 点任务卡切换状态</p></div>
+  <div class="stats">
+    <div class="stat"><div class="stat-n" id="s-todo">0</div><div class="stat-l">待办</div></div>
+    <div class="stat"><div class="stat-n wip" id="s-wip">0</div><div class="stat-l">进行中</div></div>
+    <div class="stat"><div class="stat-n done" id="s-done">0</div><div class="stat-l">完成</div></div>
+  </div>
+</header>
+<div class="legend-bar">
+  <div class="leg"><div class="leg-dot" style="background:var(--edm-dot)"></div>EDM</div>
+  <div class="leg"><div class="leg-dot" style="background:var(--post-dot)"></div>Post</div>
+  <div class="leg"><div class="leg-dot" style="background:var(--sub-dot)"></div>订阅</div>
+  <div class="leg"><div class="leg-dot" style="background:var(--ad-dot)"></div>广告</div>
+  <div class="leg"><div class="leg-dot" style="background:var(--site-dot)"></div>网站</div>
+  <div class="leg"><div class="leg-dot" style="background:var(--blog-dot)"></div>Blog</div>
+  <div class="leg"><div class="leg-dot" style="background:var(--talk-dot)"></div>讨论</div>
+</div>
+<main class="main">
+  <div class="day-grid" id="board"></div>
+  <div class="section" id="ongoing-section" style="display:none">
+    <div class="section-title">持续推进</div>
+    <div class="ongoing-grid" id="ongoing-board"></div>
+  </div>
+  ${nextWeekNote ? `<div class="footer-note"><strong>下周预告：</strong>${nextWeekNote}</div>` : ''}
+</main>
+<script>
+const TYPES={edm:{label:'EDM',bg:'var(--edm-bg)',c:'var(--edm-c)',dot:'var(--edm-dot)'},post:{label:'Post',bg:'var(--post-bg)',c:'var(--post-c)',dot:'var(--post-dot)'},sub:{label:'订阅',bg:'var(--sub-bg)',c:'var(--sub-c)',dot:'var(--sub-dot)'},ad:{label:'广告',bg:'var(--ad-bg)',c:'var(--ad-c)',dot:'var(--ad-dot)'},site:{label:'网站',bg:'var(--site-bg)',c:'var(--site-c)',dot:'var(--site-dot)'},blog:{label:'Blog',bg:'var(--blog-bg)',c:'var(--blog-c)',dot:'var(--blog-dot)'},talk:{label:'讨论',bg:'var(--talk-bg)',c:'var(--talk-c)',dot:'var(--talk-dot)'}};
+const DAYS=${daysJSON};
+let tasks=${tasksJSON};
+const saved=localStorage.getItem('ops-v2-status');
+if(saved){const m=JSON.parse(saved);tasks.forEach(t=>{if(m[t.id]!=null)t.status=m[t.id];});}
+function save(){const m={};tasks.forEach(t=>{m[t.id]=t.status;});localStorage.setItem('ops-v2-status',JSON.stringify(m));}
+function sl(s){return['待办','进行中','完成'][s];}
+function sc(s){return['s0','s1','s2'][s];}
+function cardHTML(t,delay){const tp=TYPES[t.type]||TYPES.talk;const lines=t.title.replace(/\\n/g,'<br>');return \`<div class="card\${t.status===2?' done':''}" style="animation-delay:\${delay}ms" onclick="cycle(\${t.id})"><div class="card-type" style="background:\${tp.bg};color:\${tp.c}"><div class="card-type-dot" style="background:\${tp.dot}"></div>\${tp.label}</div><div class="card-title">\${lines}</div><div class="card-footer">\${t.person?\`<span class="person">\${t.person}</span>\`:'<span></span>'}<button class="status-btn \${sc(t.status)}" onclick="event.stopPropagation();cycle(\${t.id})">\${sl(t.status)}</button></div></div>\`;}
+function render(){const board=document.getElementById('board');board.innerHTML=DAYS.map(d=>{const dt=tasks.filter(t=>t.dateKey===d.date);return\`<div><div class="col-head\${d.today?' today':''}"><span class="day">\${d.date}\${d.today?'<span class="today-badge">TODAY</span>':''}</span><span class="wday">\${d.week}</span></div>\${dt.map((t,i)=>cardHTML(t,i*40)).join('')}</div>\`;}).join('');const og=tasks.filter(t=>t.dateKey==='ongoing');const os=document.getElementById('ongoing-section');if(og.length){os.style.display='block';document.getElementById('ongoing-board').innerHTML=og.map((t,i)=>cardHTML(t,i*40)).join('');}else{os.style.display='none';}const todo=tasks.filter(t=>t.status===0).length;const wip=tasks.filter(t=>t.status===1).length;const done=tasks.filter(t=>t.status===2).length;document.getElementById('total').textContent=tasks.length;document.getElementById('s-todo').textContent=todo;document.getElementById('s-wip').textContent=wip;document.getElementById('s-done').textContent=done;}
+window.cycle=function(id){const t=tasks.find(x=>x.id===id);if(t){t.status=(t.status+1)%3;save();render();}};
+render();
+<\/script>
+</body>
+</html>`;
+}
+</script>
+</body>
+</html>
